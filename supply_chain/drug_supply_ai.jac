@@ -1,156 +1,152 @@
+import from byllm { Model }
 
+glob llm = Model(model_name="gemini/gemini-2.0-flash", verbose=True);
 
 # -----------------------------
-# Objects
+# Facility Object
 # -----------------------------
-obj Warehouse { has name: str; has inventory: dict; }
-obj Hospital  { has name: str; has inventory: dict; }
-obj Pharmacy  { has name: str; has inventory: dict; }
+obj Facility {
+    has name:str;
+    has inventory:str = {};
+}
 
-impl Warehouse.init {
+impl Facility.init(name) {
     self.name = name;
     self.inventory = {};
 }
 
-impl Warehouse.stock_drugs(drug: str, qty: int) {
+impl Facility.add(drug, qty) {
     self.inventory[drug] = self.inventory.get(drug, 0) + qty;
 }
 
-impl Hospital.init {
-    self.name = name;
-    self.inventory = {};
-}
-
-impl Hospital.receive_shipment(drug: str, qty: int) {
-    self.inventory[drug] = self.inventory.get(drug, 0) + qty;
-}
-
-impl Pharmacy.init {
-    self.name = name;
-    self.inventory = {};
-}
-
-impl Pharmacy.dispense(drug: str, qty: int) {
+impl Facility.remove(drug, qty) {
     available = self.inventory.get(drug, 0);
     if qty > available {
         qty = available;
     }
-    self.inventory[drug] -= qty;
+    self.inventory[drug] = available - qty;
+    return qty;
 }
 
 # -----------------------------
-# Nodes
+# Specialized Facility Objects
 # -----------------------------
-node warehouse_turn { can ship with SupplyChainGame entry; }
-node hospital_turn  { can ship with SupplyChainGame entry; }
-node pharmacy_turn  { can dispense with SupplyChainGame entry; }
+obj Warehouse(Facility) {}
+obj Hospital(Facility) {}
+obj Pharmacy(Facility) {}
 
 # -----------------------------
-# Walker
+# Interactive App Walker
 # -----------------------------
-walker SupplyChainGame {
-    has drug: str;
-    has warehouse: Warehouse;
-    has hospital: Hospital;
-    has pharmacy: Pharmacy;
+walker SupplyChainApp {
+    has warehouse:str;
+    has hospital:str;
+    has pharmacy:str;
 
-    has w_turn: warehouse_turn;
-    has h_turn: hospital_turn;
-    has p_turn: pharmacy_turn;
+    impl start() {
+        print("Welcome to the Jac Supply Chain App (AI-powered)!");
+        print("Type 'quit' to exit.");
 
-    has w_qty: int;   # quantity to ship from warehouse
-    has h_qty: int;   # quantity to ship from hospital
-    has p_qty: int;   # quantity to dispense at pharmacy
+        while True {
+            print("\nChoose an action: (1) Stock Warehouse  (2) Ship to Hospital  (3) Ship to Pharmacy  (4) Dispense  (5) Show Inventories");
+            action = input("> ");
 
-    has narrations: list = [];
+            if action == "quit" {
+                print("Goodbye!");
+                break;
+            }
 
-    can start_game with `root entry;
-    can narrate with byllm;
+            if action == "1" {
+                print("Enter drug name:");
+                drug = input("> ");
+                print("Enter quantity:");
+                qty = int(input("> "));
+                self.warehouse.add(drug, qty);
+                self.narrate("Added " + str(qty) + " units of " + drug + " to Warehouse.");
+            }
+
+            elif action == "2" {
+                print("Enter drug name:");
+                drug = input("> ");
+                print("Enter quantity to ship to Hospital:");
+                qty = int(input("> "));
+                shipped = self.warehouse.remove(drug, qty);
+                self.hospital.add(drug, shipped);
+                self.narrate("Shipped " + str(shipped) + " units of " + drug + " to Hospital.");
+            }
+
+            elif action == "3" {
+                print("Enter drug name:");
+                drug = input("> ");
+                print("Enter quantity to ship to Pharmacy:");
+                qty = int(input("> "));
+                shipped = self.hospital.remove(drug, qty);
+                self.pharmacy.add(drug, shipped);
+                self.narrate("Hospital shipped " + str(shipped) + " units of " + drug + " to Pharmacy.");
+            }
+
+            elif action == "4" {
+                print("Enter drug name:");
+                drug = input("> ");
+                print("Enter quantity to dispense:");
+                qty = int(input("> "));
+                dispensed = self.pharmacy.remove(drug, qty);
+                self.narrate("Pharmacy dispensed " + str(dispensed) + " units of " + drug + " to patients.");
+            }
+
+            elif action == "5" {
+                inventories = (
+                    "\n📦 Warehouse: " + str(self.warehouse.inventory) +
+                    "\n🏥 Hospital: " + str(self.hospital.inventory) +
+                    "\n💊 Pharmacy: " + str(self.pharmacy.inventory)
+                );
+                print(inventories);
+            }
+
+            else {
+                print("Invalid choice, try again!");
+            }
+        }
+    }
+
+     impl narrate(msg) {
+        prompt = "Provide a brief, professional narration for this supply chain event: " + msg;
+        response = llm.generate(prompt);
+        print("\n🤖 AI says: " + response);
+    }
 }
 
-impl SupplyChainGame.start_game {
-    visit [--> self.w_turn];
-}
-
 # -----------------------------
-# Node Logic
-# -----------------------------
-impl warehouse_turn.ship {
-    visitor.warehouse.inventory[visitor.drug] -= visitor.w_qty;
-    visitor.hospital.receive_shipment(visitor.drug, visitor.w_qty);
-
-    visitor.narrate("The warehouse shipped " + str(visitor.w_qty) +
-                    " units of " + visitor.drug +
-                    ". Give resupply strategies if stock runs low.");
-
-    visit [--> visitor.h_turn];
-}
-
-impl hospital_turn.ship {
-    visitor.hospital.inventory[visitor.drug] -= visitor.h_qty;
-    visitor.pharmacy.inventory[visitor.drug] = visitor.pharmacy.inventory.get(visitor.drug, 0) + visitor.h_qty;
-
-    visitor.narrate("The hospital sent " + str(visitor.h_qty) +
-                    " units to the pharmacy. Advise on balancing ward stock vs patient demand.");
-
-    visit [--> visitor.p_turn];
-}
-
-impl pharmacy_turn.dispense {
-    visitor.pharmacy.dispense(visitor.drug, visitor.p_qty);
-
-    visitor.narrate("The pharmacy dispensed " + str(visitor.p_qty) +
-                    " doses of " + visitor.drug +
-                    " to patients. Suggest monitoring and replenishment strategies.");
-
-    # Respond with inventories + narrations
-    report = {
-        "warehouse_stock": visitor.warehouse.inventory,
-        "hospital_stock": visitor.hospital.inventory,
-        "pharmacy_stock": visitor.pharmacy.inventory,
-        "narrations": visitor.narrations,
-    };
-    return report;
-    disengage;
-}
-
-# -----------------------------
-# AI Narration
-# -----------------------------
-impl SupplyChainGame.narrate(msg: str) {
-    response = llm_response(msg);   # byLLM hook
-    self.narrations.append(response);
-}
-
-# -----------------------------
-# Entry
+# Entry Point
 # -----------------------------
 with entry {
+    print("🚀 Script starting...");
+    
     w = Warehouse("Main Warehouse");
     h = Hospital("City Hospital");
     p = Pharmacy("Main Pharmacy");
 
-    drug_name = "amox";
-    w.stock_drugs(drug_name, 200);
+    print("📦 Facilities created, spawning walker...");
+    root spawn SupplyChainApp(warehouse=w, hospital=h, pharmacy=p);
+    
+    print("✅ Walker spawned");
+}
+# Intermediate version with basic interaction
+walker interactive_test {
+    with entry {
+        print("Welcome to Supply Chain App!");
+        print("Testing basic input...");
+        
+        name = input("Enter your name: ");
+        print("Hello, " + name + "!");
+        
+        # Test AI narration
+        prompt = "Say hello to " + name;
+        response = llm.generate(prompt);
+        print("AI: " + response);
+    }
+}
 
-    w_turn = warehouse_turn();
-    h_turn = hospital_turn();
-    p_turn = pharmacy_turn();
-
-    SupplyChainGame(
-        drug=drug_name,
-        warehouse=w,
-        hospital=h,
-        pharmacy=p,
-        w_turn=w_turn,
-        h_turn=h_turn,
-        p_turn=p_turn,
-        w_qty=0,
-        h_qty=0,
-        p_qty=0
-    ) spawn root;
-
-    root ++> w_turn;
-    w_turn ++> h_turn;
-    h_turn ++> p_turn;
+with entry {
+    root spawn walker interactive_test();
 }
