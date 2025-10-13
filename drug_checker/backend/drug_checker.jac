@@ -2,7 +2,7 @@ import from byllm {Model}
 
 glob llm = Model(
     model_name="gemini/gemini-2.5-flash",
-    api_key="AIzaSyDJhEDaCeebLqO3c1_y_o69Phh4QxlUi58" # Replace with your actual API key
+    api_key="MY_API_KEY" # Replace with your actual API key
 );
 
 node Warehouse {}
