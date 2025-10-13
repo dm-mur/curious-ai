@@ -1,6 +1,7 @@
 ---
 
-# 💊 AI-Driven Drug Dispensing System (Jac + ByLLM + Gemini + FastAPI + Streamlit)
+# 💊 AI-Driven Drug Dispensing System 
+(Jac + ByLLM + Gemini + FastAPI + Streamlit)
 
 An intelligent **pharmacy workflow automation system** powered by **Jac**, **ByLLM**, and **Google Gemini**.
 This project demonstrates how **AI reasoning** can support **drug dispensing decisions** through a fully functional pipeline that integrates **LLM intelligence**, **graph-based modeling**, and **a real-time frontend**.
