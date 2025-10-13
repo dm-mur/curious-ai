@@ -3,3 +3,6 @@ uvicorn
 jaclang
 byllm
 jaseci
+streamlit
+python-dotenv
+requests

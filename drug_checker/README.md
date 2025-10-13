@@ -1,32 +1,42 @@
 ---
 
-# 💊 AI-Driven Drug Dispensing System (Jac + ByLLM + Gemini)
+# 💊 AI-Driven Drug Dispensing System (Jac + ByLLM + Gemini + FastAPI + Streamlit)
 
-This project demonstrates how to build an **AI-enhanced drug dispensing system** using **Jac** (for modeling entities and workflows) and **ByLLM** (for integrating Large Language Models like Google Gemini).
-
-It models a **pharmacy workflow** where information flows from a warehouse (drug stock and availability) to a pharmacist, who then uses **AI reasoning** to generate a **dispensing plan** for clinicians.
+An intelligent **pharmacy workflow automation system** powered by **Jac**, **ByLLM**, and **Google Gemini**.
+This project demonstrates how **AI reasoning** can support **drug dispensing decisions** through a fully functional pipeline that integrates **LLM intelligence**, **graph-based modeling**, and **a real-time frontend**.
 
 ---
 
-## 🌟 Key Highlights
+## 🌟 Overview
 
-* **Warehouse Modeling**
+The system simulates how a **pharmacist** collaborates with an **AI assistant** to design context-aware dispensing plans based on **warehouse stock data**.
+It connects a **Jac reasoning engine** to a **FastAPI backend** and a **Streamlit frontend**, producing an interactive and explainable decision workflow.
 
-  * Track drug availability (`Drug` node).
-  * Maintain stock records (`BinCard` node).
+---
 
-* **Pharmacist + AI**
+## 🧠 Core Workflow
 
-  * Collects warehouse info.
-  * Uses **Gemini 2.5 Flash** to plan dispensing based on stock and availability.
+1. **Warehouse Data (Jac Nodes)**
 
-* **Walkers (Agents)**
+   * `Drug` → Tracks drug availability.
+   * `BinCard` → Maintains stock and records.
 
-  * `StoreManager` → Collects stock data, queries the LLM.
-  * `ClinicianWalker` → Runs the full pipeline and prints the dispensing plan.
+2. **AI Reasoning (ByLLM + Gemini)**
 
-* **LLM Integration**
-  The function `create_dispense_plan` is bound directly to the Gemini model, making the plan **context-aware and human-readable**.
+   * The `create_dispense_plan` function is bound to **Google Gemini 2.5 Flash**, generating context-aware, human-readable dispensing plans.
+
+3. **Agents / Walkers**
+
+   * `StoreManager` → Gathers warehouse stock and queries the AI model.
+   * `ClinicianWalker` → Runs the full pipeline and prints the dispensing plan.
+
+4. **Backend API (FastAPI)**
+
+   * Runs the Jac logic dynamically through `/dispense_plan`.
+
+5. **Frontend (Streamlit)**
+
+   * Displays the AI-generated plan with a clean UI for clinicians.
 
 ---
 
@@ -34,117 +44,109 @@ It models a **pharmacy workflow** where information flows from a warehouse (drug
 
 ```
 .
-├── main.jac        # Core Jac code (nodes, walkers, entrypoint)
-└── README.md       # Documentation
+├── backend/
+│   ├── server.py              # FastAPI backend
+│   └── drug_checker.jac       # Jac logic for warehouse & AI reasoning
+├── frontend/
+│   └── app.py                 # Streamlit interface
+├── requirements.txt
+└── README.md
 ```
-
-### Code Flow
-
-1. **Nodes**
-
-   * `Drug`: Tracks availability of individual drugs.
-   * `BinCard`: Maintains stock list.
-   * `Pharmacist`: Works with AI to design a dispensing plan.
-
-2. **Walkers**
-
-   * `StoreManager`: Traverses warehouse, gathers stock info, and invokes AI planning.
-   * `ClinicianWalker`: Calls `StoreManager`, collects outputs, and finalizes the plan.
-
-3. **AI Binding**
-
-```python
-def create_dispense_plan(gear: dict) -> str by llm();
-```
-
-This binds the function to the Gemini model (`by llm()`), enabling **natural language plan generation**.
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Quick Start
 
 ### 1. Install Dependencies
 
-Ensure you have Jac and ByLLM installed:
-
 ```bash
-pip install jac byllm
+pip install jac byllm fastapi uvicorn streamlit
 ```
 
-### 2. Set Your API Key
+### 2. Configure Your Gemini API Key
 
-Replace the placeholder in the code:
-
-```python
-glob llm = Model(
-    model_name="gemini/gemini-2.5-flash",
-    api_key="YOUR_API_KEY"
-);
-```
-
-Or set as an environment variable:
+Set as an environment variable:
 
 ```bash
 export GEMINI_API_KEY="your_api_key_here"
 ```
 
-### 3. Run the Program
+Or edit the Jac file directly:
+
+```python
+glob llm = Model(model_name="gemini/gemini-2.5-flash", api_key="YOUR_API_KEY");
+```
+
+### 3. Run the Backend
 
 ```bash
-jac run main.jac
+uvicorn backend.server:app --reload
 ```
+
+### 4. Run the Frontend
+
+```bash
+streamlit run frontend/app.py
+```
+
+Then open the link (usually `http://localhost:8501`) to access the dashboard.
 
 ---
 
-## 📊 Sample Run
-
-### Input (Defined in Code)
-
-* Drugs available: ✅ Aspirin, Ibuprofen, Paracetamol
-* Pharmacist node present
-* LLM enabled with Gemini
-
-### Console Output
+## 🧩 Example Output
 
 ```text
-My Dispense Plan:
 Dispensing Plan for Clinician
 
-Available drugs: aspirin, ibuprofen, paracetamol
-Status: All marked as available ✅
+Available drugs: Aspirin, Ibuprofen, Paracetamol
+Status: All available ✅
 
 Recommended dispensing approach:
-- Aspirin: Dispense for mild pain and fever cases. Stock adequate.
-- Ibuprofen: Dispense for inflammation and pain management. Monitor daily usage to avoid stock-out.
-- Paracetamol: Primary first-line analgesic. Dispense broadly for mild fever/pain. Reserve backup stock.
+- Aspirin: Dispense for mild pain and fever.
+- Ibuprofen: For inflammation and pain management.
+- Paracetamol: First-line analgesic; reserve backup stock.
 
-Note: If demand increases, prioritize Paracetamol and Ibuprofen as first-line options.
+Note: Prioritize Paracetamol and Ibuprofen if supply tightens.
 ```
 
-💡 The exact plan will vary depending on **AI outputs** and the **input stock configuration**.
+The plan is dynamically generated — every run may differ depending on AI reasoning and stock data.
 
 ---
 
-## 🔮 Possible Extensions
+## 🔮 Future Enhancements
 
-* **Add quantities** to drugs (not just availability).
-* **Track expiry dates** for safer dispensing.
-* **Connect to real databases** (e.g., hospital inventory systems).
-* **Add multi-level workflows** (Central Warehouse → Hospital Store → Pharmacy → Patient).
-* **Introduce alerts** for low stock or near-expiry drugs.
+| Feature                 | Description                                 |
+| ----------------------- | ------------------------------------------- |
+| 💾 Database Integration | Connect warehouse data to SQL or DHIS2 APIs |
+| ⏳ Expiry Tracking       | Include drug expiry dates for better safety |
+| ⚙️ Multi-Level Workflow | Central → Regional → Facility dispensing    |
+| 🚨 Smart Alerts         | Notify low-stock or soon-to-expire drugs    |
+| 📈 Analytics Dashboard  | Show real-time dispensing insights          |
 
 ---
 
 ## ⚡ Tech Stack
 
-* **Jac** → Declarative language for graph-based reasoning & AI workflows.
-* **ByLLM** → Middleware for connecting Jac to LLMs.
-* **Gemini 2.5 Flash** → Google’s fast reasoning model for plan generation.
+| Layer               | Technology                  |
+| ------------------- | --------------------------- |
+| 🧬 Reasoning Engine | **Jac**                     |
+| 🤖 LLM Bridge       | **ByLLM**                   |
+| 🧠 AI Model         | **Google Gemini 2.5 Flash** |
+| ⚙️ API Server       | **FastAPI**                 |
+| 💻 Frontend         | **Streamlit**               |
+
+---
+
+## 🧪 Design Philosophy
+
+> “Pharmacy automation should be **intelligent, explainable, and adaptive**.”
+> This project bridges **human expertise** and **AI reasoning**, showing how Jac’s graph-based model can make complex workflows both interpretable and scalable.
 
 ---
 
 ## 📝 License
 
-MIT License – Free to use, modify, and distribute.
+**MIT License** – Free to use, modify, and distribute.
+© 2025 Doris Muriungi
 
 ---
