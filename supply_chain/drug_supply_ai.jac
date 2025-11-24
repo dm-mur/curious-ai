@@ -2,151 +2,171 @@ import from byllm { Model }
 
 glob llm = Model(model_name="gemini/gemini-2.0-flash", verbose=True);
 
+# helper function to call LLM
+def byllm(msg: str) -> str {
+    return llm.call(msg);
+}
+
 # -----------------------------
-# Facility Object
+# Objects
 # -----------------------------
-obj Facility {
-    has name:str;
-    has inventory:str = {};
-}
+obj Warehouse {
+    has name: str;
+    has inventory: dict;
 
-impl Facility.init(name) {
-    self.name = name;
-    self.inventory = {};
-}
-
-impl Facility.add(drug, qty) {
-    self.inventory[drug] = self.inventory.get(drug, 0) + qty;
-}
-
-impl Facility.remove(drug, qty) {
-    available = self.inventory.get(drug, 0);
-    if qty > available {
-        qty = available;
+    def init(name: str) {
+        self.name = name;
+        self.inventory = {};
     }
-    self.inventory[drug] = available - qty;
-    return qty;
-}
 
-# -----------------------------
-# Specialized Facility Objects
-# -----------------------------
-obj Warehouse(Facility) {}
-obj Hospital(Facility) {}
-obj Pharmacy(Facility) {}
+    def stock_drugs(drug: str, qty: int) {
+        self.inventory[drug] = self.inventory.get(drug, 0) + qty;
+        print("📦 Warehouse stocked:", self.inventory);
+    }
 
-# -----------------------------
-# Interactive App Walker
-# -----------------------------
-walker SupplyChainApp {
-    has warehouse:str;
-    has hospital:str;
-    has pharmacy:str;
-
-    impl start() {
-        print("Welcome to the Jac Supply Chain App (AI-powered)!");
-        print("Type 'quit' to exit.");
-
-        while True {
-            print("\nChoose an action: (1) Stock Warehouse  (2) Ship to Hospital  (3) Ship to Pharmacy  (4) Dispense  (5) Show Inventories");
-            action = input("> ");
-
-            if action == "quit" {
-                print("Goodbye!");
-                break;
-            }
-
-            if action == "1" {
-                print("Enter drug name:");
-                drug = input("> ");
-                print("Enter quantity:");
-                qty = int(input("> "));
-                self.warehouse.add(drug, qty);
-                self.narrate("Added " + str(qty) + " units of " + drug + " to Warehouse.");
-            }
-
-            elif action == "2" {
-                print("Enter drug name:");
-                drug = input("> ");
-                print("Enter quantity to ship to Hospital:");
-                qty = int(input("> "));
-                shipped = self.warehouse.remove(drug, qty);
-                self.hospital.add(drug, shipped);
-                self.narrate("Shipped " + str(shipped) + " units of " + drug + " to Hospital.");
-            }
-
-            elif action == "3" {
-                print("Enter drug name:");
-                drug = input("> ");
-                print("Enter quantity to ship to Pharmacy:");
-                qty = int(input("> "));
-                shipped = self.hospital.remove(drug, qty);
-                self.pharmacy.add(drug, shipped);
-                self.narrate("Hospital shipped " + str(shipped) + " units of " + drug + " to Pharmacy.");
-            }
-
-            elif action == "4" {
-                print("Enter drug name:");
-                drug = input("> ");
-                print("Enter quantity to dispense:");
-                qty = int(input("> "));
-                dispensed = self.pharmacy.remove(drug, qty);
-                self.narrate("Pharmacy dispensed " + str(dispensed) + " units of " + drug + " to patients.");
-            }
-
-            elif action == "5" {
-                inventories = (
-                    "\n📦 Warehouse: " + str(self.warehouse.inventory) +
-                    "\n🏥 Hospital: " + str(self.hospital.inventory) +
-                    "\n💊 Pharmacy: " + str(self.pharmacy.inventory)
-                );
-                print(inventories);
-            }
-
-            else {
-                print("Invalid choice, try again!");
-            }
+    def ship_to_hospital(drug: str, qty: int, hospital: Hospital) {
+        available = self.inventory.get(drug, 0);
+        if qty > available {
+            print("⚠️ Warehouse has only", available, " — shipping available amount.");
+            qty = available;
         }
+        self.inventory[drug] = self.inventory.get(drug, 0) - qty;
+        hospital.receive_shipment(drug, qty);
+        print("🚚 Warehouse shipped:", {drug: qty});
+    }
+}
+
+obj Hospital {
+    has name: str;
+    has inventory: dict;
+
+    def init(name: str) {
+        self.name = name;
+        self.inventory = {};
     }
 
-     impl narrate(msg) {
-        prompt = "Provide a brief, professional narration for this supply chain event: " + msg;
-        response = llm.generate(prompt);
-        print("\n🤖 AI says: " + response);
+    def receive_shipment(drug: str, qty: int) {
+        self.inventory[drug] = self.inventory.get(drug, 0) + qty;
+        print("🏥 Hospital received shipment:", {drug: qty});
+    }
+
+    def send_to_pharmacy(drug: str, qty: int, pharmacy: Pharmacy) {
+        available = self.inventory.get(drug, 0);
+        if qty > available {
+            print("⚠️ Hospital has only", available, " — sending available amount.");
+            qty = available;
+        }
+        self.inventory[drug] = self.inventory.get(drug, 0) - qty;
+        pharmacy.inventory[drug] = pharmacy.inventory.get(drug, 0) + qty;
+        print("➡️ Hospital sent to pharmacy:", {drug: qty});
+    }
+}
+
+obj Pharmacy {
+    has name: str;
+    has inventory: dict;
+
+    def init(name: str) {
+        self.name = name;
+        self.inventory = {};
+    }
+
+    def dispense(drug: str, qty: int) {
+        available = self.inventory.get(drug, 0);
+        if qty > available {
+            print("⚠️ Not enough stock, dispensing max available:", available);
+            qty = available;
+        }
+        self.inventory[drug] = self.inventory.get(drug, 0) - qty;
+        print("💊 Dispensed to patient:", {drug: qty});
     }
 }
 
 # -----------------------------
-# Entry Point
+# Nodes
+# -----------------------------
+node root {}
+
+node warehouse_turn {}
+node hospital_turn {}
+node pharmacy_turn {}
+
+# -----------------------------
+# Walker
+# -----------------------------
+# -----------------------------
+# Walker
+# -----------------------------
+walker SupplyChain {
+    has drug: str;
+    has warehouse: Warehouse;
+    has hospital: Hospital;
+    has pharmacy: Pharmacy;
+
+    can start_dispense;
+    can warehouse_action;
+    can hospital_action;
+    can pharmacy_action;
+}
+
+# -----------------------------
+# Walker abilities (impl)
+# -----------------------------
+impl SupplyChain.start_dispense {
+    visit [-->];   # root -> warehouse_turn
+}
+
+impl SupplyChain.warehouse_action {
+    msg = "The warehouse has " + str(self.warehouse.inventory.get(self.drug, 0)) +
+          " units of " + self.drug + ". How many should be shipped to the hospital?";
+    suggestion = byllm(msg);
+    qty = int(suggestion) if suggestion.isdigit() else 0;
+    self.warehouse.ship_to_hospital(self.drug, qty, self.hospital);
+    visit [-->];   # go to hospital_turn
+}
+
+impl SupplyChain.hospital_action {
+    msg = "The hospital has " + str(self.hospital.inventory.get(self.drug, 0)) +
+          " units of " + self.drug + ". How many should be sent to the pharmacy?";
+    suggestion = byllm(msg);
+    qty = int(suggestion) if suggestion.isdigit() else 0;
+    self.hospital.send_to_pharmacy(self.drug, qty, self.pharmacy);
+    visit [-->];   # go to pharmacy_turn
+}
+
+impl SupplyChain.pharmacy_action {
+    msg = "The pharmacy has " + str(self.pharmacy.inventory.get(self.drug, 0)) +
+          " units of " + self.drug + ". How many should be dispensed to patients?";
+    suggestion = byllm(msg);
+    qty = int(suggestion) if suggestion.isdigit() else 0;
+    self.pharmacy.dispense(self.drug, qty);
+    disengage;
+}
+
+# -----------------------------
+# Entry
 # -----------------------------
 with entry {
-    print("🚀 Script starting...");
-    
     w = Warehouse("Main Warehouse");
     h = Hospital("City Hospital");
     p = Pharmacy("Main Pharmacy");
 
-    print("📦 Facilities created, spawning walker...");
-    root spawn SupplyChainApp(warehouse=w, hospital=h, pharmacy=p);
-    
-    print("✅ Walker spawned");
-}
-# Intermediate version with basic interaction
-walker interactive_test {
-    with entry {
-        print("Welcome to Supply Chain App!");
-        print("Testing basic input...");
-        
-        name = input("Enter your name: ");
-        print("Hello, " + name + "!");
-        
-        # Test AI narration
-        prompt = "Say hello to " + name;
-        response = llm.generate(prompt);
-        print("AI: " + response);
-    }
-}
+    drug_name = input("Enter drug name: ");
+    qty_init = int(input("Enter initial quantity in warehouse: "));
+    w.stock_drugs(drug_name, qty_init);
 
-with entry {
-    root spawn walker interactive_test();
+    w_turn = warehouse_turn();
+    h_turn = hospital_turn();
+    p_turn = pharmacy_turn();
+
+    root ++> w_turn;
+    w_turn ++> h_turn;
+    h_turn ++> p_turn;
+
+    SupplyChain(
+        drug = drug_name,
+        warehouse = w,
+        hospital = h,
+        pharmacy = p
+    ) spawn root;
 }

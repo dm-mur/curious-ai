@@ -1,0 +1,15 @@
+# Core dependencies
+tree-sitter
+tree-sitter-python
+requests
+graphviz
+pydot
+
+# Frontend
+streamlit
+plotly
+
+# Backend service
+fastapi
+uvicorn
+python-multipart

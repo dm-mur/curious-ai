@@ -6,6 +6,7 @@ API_URL = "http://127.0.0.1:8000/dispense_plan"
 
 st.set_page_config(page_title="AI Drug Dispensing System", layout="wide")
 
+
 st.title("💊 AI-Enhanced Drug Dispensing System")
 st.markdown("### Powered by Jac + Gemini + FastAPI")
 
